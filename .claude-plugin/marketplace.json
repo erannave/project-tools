@@ -1,0 +1,16 @@
+{
+  "name": "project-tools",
+  "description": "Claude Code plugins for Gitea and OpenProject integration",
+  "version": "1.0.0",
+  "owner": {
+    "name": "erannave"
+  },
+  "plugins": [
+    {
+      "name": "project-tools",
+      "source": "./",
+      "description": "Skills for interacting with Gitea pull requests and OpenProject work packages",
+      "version": "1.0.1"
+    }
+  ]
+}
