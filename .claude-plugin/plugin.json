@@ -1,13 +1,10 @@
 {
   "name": "project-tools",
   "description": "Skills for interacting with Gitea pull requests and OpenProject work packages",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": {
     "name": "Eran"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/erannave/project-tools.git"
-  },
+  "repository": "https://github.com/erannave/project-tools.git",
   "keywords": ["gitea", "openproject", "pull-requests", "project-management"]
 }
