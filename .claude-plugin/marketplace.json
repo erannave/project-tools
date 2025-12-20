@@ -1,7 +1,7 @@
 {
   "name": "project-tools",
-  "description": "Claude Code plugins for Gitea and OpenProject integration",
-  "version": "1.0.2",
+  "description": "Claude Code plugins for Gitea, OpenProject, and Hoppscotch integration",
+  "version": "1.0.3",
   "owner": {
     "name": "erannave"
   },
@@ -9,8 +9,8 @@
     {
       "name": "project-tools",
       "source": "./",
-      "description": "Skills for interacting with Gitea pull requests and OpenProject work packages",
-      "version": "1.0.2"
+      "description": "Skills for Gitea PRs, OpenProject work packages, and Hoppscotch API testing",
+      "version": "1.0.3"
     }
   ]
 }
