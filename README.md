@@ -1,6 +1,6 @@
 # Project Tools - Claude Code Plugin
 
-A Claude Code plugin providing skills for interacting with Gitea and OpenProject APIs.
+A Claude Code plugin providing skills for interacting with Gitea, OpenProject, and Hoppscotch APIs.
 
 ## Skills Included
 
@@ -21,6 +21,15 @@ Interact with OpenProject API v3 for work package management. Supports:
 - Creating new work packages
 - Updating existing work packages
 - Listing work packages by project
+
+### hoppscotch
+
+Run API tests using the Hoppscotch CLI. Supports:
+
+- Running local and cloud collections
+- Environment configuration
+- JUnit XML test reports for CI/CD
+- Data-driven testing with CSV iterations
 
 ## Installation
 
@@ -60,5 +69,15 @@ To get your API key:
 1. Log into your OpenProject instance
 2. Go to My Account → Access tokens
 3. Create a new API token
+
+### Hoppscotch
+
+Requires Node.js v22+ and the Hoppscotch CLI:
+
+```bash
+npm i -g @hoppscotch/cli
+```
+
+For cloud collections, you'll need a personal access token from your Hoppscotch account.
 
 Add these exports to your `~/.bashrc` or `~/.zshrc` to make them permanent.

@@ -1,10 +1,10 @@
 {
   "name": "project-tools",
-  "description": "Skills for interacting with Gitea pull requests and OpenProject work packages",
-  "version": "1.0.2",
+  "description": "Skills for Gitea PRs, OpenProject work packages, and Hoppscotch API testing",
+  "version": "1.0.3",
   "author": {
     "name": "Eran"
   },
   "repository": "https://github.com/erannave/project-tools.git",
-  "keywords": ["gitea", "openproject", "pull-requests", "project-management"]
+  "keywords": ["gitea", "openproject", "hoppscotch", "pull-requests", "project-management", "api-testing"]
 }
