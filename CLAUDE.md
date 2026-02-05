@@ -41,8 +41,7 @@ The skill body contains markdown documentation that guides Claude on how to perf
 ## Environment Variables Required by Skills
 
 **Gitea:**
-- `GITEA_URL` - Base URL of the Gitea instance
-- `GITEA_TOKEN` - Personal access token with repo scope
+- `GITEA_TOKEN` - Personal access token with repo scope (base URL is derived from user input or git remote)
 
 **OpenProject:**
 - `OPENPROJECT_URL` - Base URL of the OpenProject instance

@@ -11,26 +11,56 @@ description: |
 
 # OpenProject API
 
-## Prerequisites (Always Check First)
+## Step 1: Determine Base URL
+
+**If user provided an OpenProject URL** like `https://openproject.example.com/work_packages/123`:
+Parse the base URL directly from it. Use it as a literal value in all subsequent commands.
+
+**Otherwise**, read from environment (with sanitization):
 
 ```bash
-echo "OPENPROJECT_URL: ${OPENPROJECT_URL:-NOT SET}" && echo "OPENPROJECT_API_KEY: ${OPENPROJECT_API_KEY:-NOT SET}"
+printf '%s' "$OPENPROJECT_URL" | tr -d '\r\n '
 ```
 
-If NOT SET, try sourcing shell configs:
+If empty, try sourcing shell configs:
 
 ```bash
-for f in ~/.zshenv ~/.zshrc ~/.bashrc; do [ -f "$f" ] && source "$f"; done
+for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done && printf '%s' "$OPENPROJECT_URL" | tr -d '\r\n '
 ```
 
-If still missing, tell user to set `OPENPROJECT_URL` and `OPENPROJECT_API_KEY` (from My Account → Access tokens).
+If still empty, tell user to set `OPENPROJECT_URL`.
 
-## Core Operations
+## Step 2: Get API Key
+
+IMPORTANT: Environment variables in Claude Code may contain invisible characters (`\r`, `\n`) that silently break curl. Always sanitize.
+
+```bash
+printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n '
+```
+
+If empty, try sourcing shell configs:
+
+```bash
+for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done && printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n '
+```
+
+If still empty, tell user to set `OPENPROJECT_API_KEY` (from My Account → Access tokens).
+
+## Step 3: Make API Calls
+
+> **CRITICAL: Never use `${OPENPROJECT_URL}` or `${OPENPROJECT_API_KEY}` shell variable references directly in curl commands.** They cause intermittent failures due to invisible characters in env vars.
+
+Instead, always:
+- Use the **literal base URL** obtained in Step 1 — substitute it directly into the curl command
+- For the API key, use **inline sanitization**: `$(printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n ')`
+
+In the examples below, replace `BASE_URL` with the actual literal URL from Step 1.
 
 ### Get Work Package
 
 ```bash
-curl -u "apikey:$OPENPROJECT_API_KEY" "$OPENPROJECT_URL/api/v3/work_packages/{id}"
+curl -s -u "apikey:$(printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n ')" \
+  'BASE_URL/api/v3/work_packages/{id}'
 ```
 
 Key fields: `subject`, `description.raw`, `lockVersion` (required for updates), `_links.status/assignee/project`
@@ -38,8 +68,8 @@ Key fields: `subject`, `description.raw`, `lockVersion` (required for updates), 
 ### Find Project by Name
 
 ```bash
-curl -u "apikey:$OPENPROJECT_API_KEY" \
-  "$OPENPROJECT_URL/api/v3/projects?filters=[{\"name_and_identifier\":{\"operator\":\"~\",\"values\":[\"PROJECT_NAME\"]}}]"
+curl -s -u "apikey:$(printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n ')" \
+  'BASE_URL/api/v3/projects?filters=[{"name_and_identifier":{"operator":"~","values":["PROJECT_NAME"]}}]'
 ```
 
 Project ID in `_embedded.elements[0].id`
@@ -47,7 +77,8 @@ Project ID in `_embedded.elements[0].id`
 ### List Work Packages
 
 ```bash
-curl -u "apikey:$OPENPROJECT_API_KEY" "$OPENPROJECT_URL/api/v3/projects/{project_id}/work_packages"
+curl -s -u "apikey:$(printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n ')" \
+  'BASE_URL/api/v3/projects/{project_id}/work_packages'
 ```
 
 Filter open: `?filters=[{"status":{"operator":"o","values":[]}}]`
@@ -55,9 +86,9 @@ Filter open: `?filters=[{"status":{"operator":"o","values":[]}}]`
 ### Create Work Package
 
 ```bash
-curl -X POST -u "apikey:$OPENPROJECT_API_KEY" \
+curl -s -X POST -u "apikey:$(printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n ')" \
   -H "Content-Type: application/json" \
-  "$OPENPROJECT_URL/api/v3/projects/{project_id}/work_packages" \
+  'BASE_URL/api/v3/projects/{project_id}/work_packages' \
   -d '{"subject": "...", "description": {"raw": "..."}, "_links": {"type": {"href": "/api/v3/types/{type_id}"}}}'
 ```
 
@@ -66,9 +97,9 @@ curl -X POST -u "apikey:$OPENPROJECT_API_KEY" \
 **Must include current `lockVersion` from GET response:**
 
 ```bash
-curl -X PATCH -u "apikey:$OPENPROJECT_API_KEY" \
+curl -s -X PATCH -u "apikey:$(printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n ')" \
   -H "Content-Type: application/json" \
-  "$OPENPROJECT_URL/api/v3/work_packages/{id}" \
+  'BASE_URL/api/v3/work_packages/{id}' \
   -d '{"lockVersion": {N}, "subject": "...", "description": {"raw": "..."}}'
 ```
 

@@ -49,9 +49,10 @@ Both skills require environment variables to be set before use.
 ### Gitea
 
 ```bash
-export GITEA_URL="https://your-gitea-instance.com"
 export GITEA_TOKEN="your-personal-access-token"
 ```
+
+The Gitea base URL is automatically derived from the PR URL you provide or from `git remote get-url origin`.
 
 To get your API token:
 1. Log into your Gitea instance
