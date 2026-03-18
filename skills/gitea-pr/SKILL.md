@@ -6,7 +6,8 @@ description: |
   - User mentions "Gitea" with PRs, code review, or repositories
   - Creating, reviewing, commenting on, or merging pull requests on Gitea
   - User says "create a PR", "submit for review" when working with a Gitea remote
-  Handles complete PR lifecycle: creation, review, comments, approvals, and merging.
+  - User asks about CI status, check results, failed checks, or build artifacts on a PR
+  Handles complete PR lifecycle: creation, review, comments, approvals, merging, and CI check inspection.
 ---
 
 # Gitea Pull Requests
@@ -115,6 +116,77 @@ curl -s -X POST 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR_NUMBER/merge' \
 
 Merge strategies: `merge`, `rebase`, `squash`
 
+### Get CI Check Results
+
+First get the PR head SHA, then fetch statuses and Actions runs in parallel.
+
+**Get head SHA from PR:**
+```bash
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR_NUMBER' \
+  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')" \
+  | python3 -c "import sys,json; pr=json.load(sys.stdin); print(pr['head']['sha'])"
+```
+
+**Get combined commit status (traditional CI):**
+```bash
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/commits/HEAD_SHA/status' \
+  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+```
+
+Returns: `state` (pending/success/error/failure/warning), `statuses[]` with `context`, `description`, `target_url`, `state`.
+
+**List individual commit statuses:**
+```bash
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/commits/HEAD_SHA/statuses' \
+  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+```
+
+**Get Gitea Actions workflow runs for this specific commit:**
+```bash
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/actions/runs?head_sha=HEAD_SHA' \
+  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+```
+
+Using `head_sha` scopes results to this PR's commit — `?status=failure` alone would return failures from other branches too.
+
+**Get jobs for a specific run (includes step-level logs):**
+```bash
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/actions/runs/RUN_ID/jobs' \
+  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+```
+
+**List artifacts for a run:**
+```bash
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/actions/runs/RUN_ID/artifacts' \
+  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+```
+
+**Download an artifact** (get download URL from artifact list, then):
+```bash
+curl -sL 'ARTIFACT_DOWNLOAD_URL' \
+  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')" \
+  -o artifact.zip
+```
+
+**Efficient all-checks summary** — run these in parallel (use `&` + `wait`):
+```bash
+TOKEN=$(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/commits/SHA/status' -H "Authorization: token $TOKEN" > /tmp/pr_status.json &
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/actions/runs?head_sha=SHA' -H "Authorization: token $TOKEN" > /tmp/pr_runs.json &
+wait
+python3 -c "
+import json
+status = json.load(open('/tmp/pr_status.json'))
+runs = json.load(open('/tmp/pr_runs.json'))
+print('Combined status:', status.get('state'))
+for s in status.get('statuses', []):
+    print(f\"  {s['state']:10} {s['context']}: {s['description']}\")
+print()
+for run in runs.get('workflow_runs', []):
+    print(f\"  {run['status']:10} {run['name']} #{run['run_number']} ({run['conclusion']})\")
+"
+```
+
 ## Quick Reference
 
 | Operation | Endpoint | Method |
@@ -126,5 +198,10 @@ Merge strategies: `merge`, `rebase`, `squash`
 | Add comment | `/repos/{owner}/{repo}/issues/{index}/comments` | POST |
 | Submit review | `/repos/{owner}/{repo}/pulls/{index}/reviews` | POST |
 | Merge PR | `/repos/{owner}/{repo}/pulls/{index}/merge` | POST |
+| Combined status | `/repos/{owner}/{repo}/commits/{sha}/status` | GET |
+| List statuses | `/repos/{owner}/{repo}/commits/{sha}/statuses` | GET |
+| Actions runs | `/repos/{owner}/{repo}/actions/runs` | GET |
+| Run jobs | `/repos/{owner}/{repo}/actions/runs/{run_id}/jobs` | GET |
+| Run artifacts | `/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts` | GET |
 
 For complete API docs including request/response schemas, see [references/gitea-api.md](references/gitea-api.md).

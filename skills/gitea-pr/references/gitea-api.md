@@ -159,6 +159,118 @@ POST /api/v1/repos/{owner}/{repo}/issues/{index}/assignees  {"assignees": [...]}
 DELETE /api/v1/repos/{owner}/{repo}/issues/{index}/assignees
 ```
 
+## Commit Status Endpoints
+
+### Get Combined Status
+
+```
+GET /api/v1/repos/{owner}/{repo}/commits/{sha}/status
+```
+
+Returns the combined state (`pending`, `success`, `error`, `failure`, `warning`) and all individual statuses.
+
+**Response:**
+```json
+{
+  "state": "failure",
+  "statuses": [
+    {
+      "id": 1,
+      "state": "failure",
+      "context": "continuous-integration/jenkins",
+      "description": "Build failed",
+      "target_url": "https://ci.example.com/build/42",
+      "created": "...",
+      "updated": "..."
+    }
+  ],
+  "sha": "abc123",
+  "total_count": 2,
+  "commit": { ... },
+  "url": "..."
+}
+```
+
+### List Commit Statuses
+
+```
+GET /api/v1/repos/{owner}/{repo}/commits/{sha}/statuses
+```
+
+Query params: `sort` (oldest/recentupdate), `state`, `page`, `limit`
+
+### Create Commit Status
+
+```
+POST /api/v1/repos/{owner}/{repo}/statuses/{sha}
+```
+
+Body: `state`, `target_url`, `description`, `context`
+
+## Gitea Actions Endpoints
+
+### List Workflow Runs
+
+```
+GET /api/v1/repos/{owner}/{repo}/actions/runs
+```
+
+Query params: `actor`, `branch`, `event`, `status` (queued/in_progress/waiting/success/failure/cancelled/skipped), `head_sha`, `page`, `limit`
+
+**Response fields per run:** `id`, `name`, `run_number`, `status`, `conclusion`, `head_sha`, `head_branch`, `workflow_id`, `created`, `updated`
+
+### Get Workflow Run
+
+```
+GET /api/v1/repos/{owner}/{repo}/actions/runs/{run_id}
+```
+
+### List Jobs for Run
+
+```
+GET /api/v1/repos/{owner}/{repo}/actions/runs/{run_id}/jobs
+```
+
+**Response fields per job:** `id`, `name`, `status`, `conclusion`, `started_at`, `completed_at`, `steps[]` (name, status, conclusion, number)
+
+### Get Job Logs
+
+```
+GET /api/v1/repos/{owner}/{repo}/actions/jobs/{job_id}/logs
+```
+
+Returns raw log text.
+
+### List Artifacts for Run
+
+```
+GET /api/v1/repos/{owner}/{repo}/actions/runs/{run_id}/artifacts
+```
+
+**Response fields per artifact:** `id`, `name`, `size_in_bytes`, `expired`, `created_at`, `expires_at`, `url`
+
+### Download Artifact
+
+```
+GET /api/v1/repos/{owner}/{repo}/actions/artifacts/{artifact_id}/zip
+```
+
+Returns a redirect to the zip download. Use `curl -sL` to follow redirects.
+
+### List All Repo Artifacts
+
+```
+GET /api/v1/repos/{owner}/{repo}/actions/artifacts
+```
+
+Query params: `name`, `page`, `limit`
+
+### Delete Artifact
+
+```
+DELETE /api/v1/repos/{owner}/{repo}/actions/artifacts/{artifact_id}
+```
+
 ## Response Codes
 
 | Code | Meaning |
