@@ -31,19 +31,17 @@ Store these as literal strings for use in curl commands.
 
 ## Step 2: Get API Token
 
-IMPORTANT: Environment variables in Claude Code may contain invisible characters (`\r`, `\n`) that silently break curl. Always sanitize.
+**Always source shell configs first** — ctx_execute and similar sandboxes run in a clean environment where `$GITEA_TOKEN` is not inherited. Sourcing upfront avoids silent empty-token failures:
 
 ```bash
-printf '%s' "$GITEA_TOKEN" | tr -d '\r\n '
+for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done
+TOKEN=$(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')
+echo "Token length: ${#TOKEN}"
 ```
 
-If output is empty, try sourcing shell configs:
+If token is still empty, tell the user to set `GITEA_TOKEN` (Gitea → Settings → Applications, `repo` scope).
 
-```bash
-for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done && printf '%s' "$GITEA_TOKEN" | tr -d '\r\n '
-```
-
-If still empty, tell user to set `GITEA_TOKEN` (Settings → Applications, `repo` scope).
+Use `$TOKEN` (already sanitized) in all subsequent curl commands — no need to re-sanitize inline.
 
 ## Step 3: Make API Calls
 
@@ -51,7 +49,7 @@ If still empty, tell user to set `GITEA_TOKEN` (Settings → Applications, `repo
 
 Instead, always:
 - Use the **literal base URL** obtained in Step 1 (from user URL or git remote) — substitute it directly into the curl command
-- For the token, use **inline sanitization**: `$(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')`
+- Use `$TOKEN` — the sanitized variable set in Step 2 (already has `\r\n` stripped)
 
 In the examples below, replace `BASE_URL`, `OWNER`, `REPO`, and `PR_NUMBER` with the actual literal values from Step 1.
 
@@ -59,28 +57,28 @@ In the examples below, replace `BASE_URL`, `OWNER`, `REPO`, and `PR_NUMBER` with
 
 ```bash
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR_NUMBER' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+  -H "Authorization: token $TOKEN"
 ```
 
 ### Get Diff
 
 ```bash
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR_NUMBER.diff' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+  -H "Authorization: token $TOKEN"
 ```
 
 ### List Changed Files
 
 ```bash
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR_NUMBER/files' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+  -H "Authorization: token $TOKEN"
 ```
 
 ### Create PR
 
 ```bash
 curl -s -X POST 'BASE_URL/api/v1/repos/OWNER/REPO/pulls' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')" \
+  -H "Authorization: token $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"title": "...", "body": "...", "head": "feature-branch", "base": "main"}'
 ```
@@ -89,7 +87,7 @@ curl -s -X POST 'BASE_URL/api/v1/repos/OWNER/REPO/pulls' \
 
 ```bash
 curl -s -X POST 'BASE_URL/api/v1/repos/OWNER/REPO/issues/PR_NUMBER/comments' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')" \
+  -H "Authorization: token $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "..."}'
 ```
@@ -98,7 +96,7 @@ curl -s -X POST 'BASE_URL/api/v1/repos/OWNER/REPO/issues/PR_NUMBER/comments' \
 
 ```bash
 curl -s -X POST 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR_NUMBER/reviews' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')" \
+  -H "Authorization: token $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"body": "...", "event": "APPROVED"}'
 ```
@@ -109,7 +107,7 @@ Event values: `APPROVED`, `REQUEST_CHANGES`, `COMMENT`
 
 ```bash
 curl -s -X POST 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR_NUMBER/merge' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')" \
+  -H "Authorization: token $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"do": "merge"}'
 ```
@@ -123,14 +121,14 @@ First get the PR head SHA, then fetch statuses and Actions runs in parallel.
 **Get head SHA from PR:**
 ```bash
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR_NUMBER' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')" \
+  -H "Authorization: token $TOKEN" \
   | python3 -c "import sys,json; pr=json.load(sys.stdin); print(pr['head']['sha'])"
 ```
 
 **Get combined commit status (traditional CI):**
 ```bash
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/commits/HEAD_SHA/status' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+  -H "Authorization: token $TOKEN"
 ```
 
 Returns: `state` (pending/success/error/failure/warning), `statuses[]` with `context`, `description`, `target_url`, `state`.
@@ -138,13 +136,13 @@ Returns: `state` (pending/success/error/failure/warning), `statuses[]` with `con
 **List individual commit statuses:**
 ```bash
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/commits/HEAD_SHA/statuses' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+  -H "Authorization: token $TOKEN"
 ```
 
 **Get Gitea Actions workflow runs for this specific commit:**
 ```bash
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/actions/runs?head_sha=HEAD_SHA' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+  -H "Authorization: token $TOKEN"
 ```
 
 Using `head_sha` scopes results to this PR's commit — `?status=failure` alone would return failures from other branches too.
@@ -152,25 +150,24 @@ Using `head_sha` scopes results to this PR's commit — `?status=failure` alone 
 **Get jobs for a specific run (includes step-level logs):**
 ```bash
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/actions/runs/RUN_ID/jobs' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+  -H "Authorization: token $TOKEN"
 ```
 
 **List artifacts for a run:**
 ```bash
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/actions/runs/RUN_ID/artifacts' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')"
+  -H "Authorization: token $TOKEN"
 ```
 
 **Download an artifact** (get download URL from artifact list, then):
 ```bash
 curl -sL 'ARTIFACT_DOWNLOAD_URL' \
-  -H "Authorization: token $(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')" \
+  -H "Authorization: token $TOKEN" \
   -o artifact.zip
 ```
 
 **Efficient all-checks summary** — run these in parallel (use `&` + `wait`):
 ```bash
-TOKEN=$(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/commits/SHA/status' -H "Authorization: token $TOKEN" > /tmp/pr_status.json &
 curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/actions/runs?head_sha=SHA' -H "Authorization: token $TOKEN" > /tmp/pr_runs.json &
 wait
