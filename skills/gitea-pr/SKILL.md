@@ -31,15 +31,16 @@ Store these as literal strings for use in curl commands.
 
 ## Step 2: Get API Token
 
-**Always source shell configs first** — ctx_execute and similar sandboxes run in a clean environment where `$GITEA_TOKEN` is not inherited. Sourcing upfront avoids silent empty-token failures:
+**Always source shell configs and the local `.env` file first** — ctx_execute and similar sandboxes run in a clean environment where `$GITEA_TOKEN` is not inherited. Sourcing upfront avoids silent empty-token failures:
 
 ```bash
 for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done
+[ -f ".env" ] && export $(grep -v '^#' .env | xargs) 2>/dev/null
 TOKEN=$(printf '%s' "$GITEA_TOKEN" | tr -d '\r\n ')
 echo "Token length: ${#TOKEN}"
 ```
 
-If token is still empty, tell the user to set `GITEA_TOKEN` (Gitea → Settings → Applications, `repo` scope).
+If token is still empty, tell the user to set `GITEA_TOKEN` in their shell environment or in a `.env` file in the current directory (Gitea → Settings → Applications, `repo` scope).
 
 Use `$TOKEN` (already sanitized) in all subsequent curl commands — no need to re-sanitize inline.
 

@@ -16,19 +16,15 @@ description: |
 **If user provided an OpenProject URL** like `https://openproject.example.com/work_packages/123`:
 Parse the base URL directly from it. Use it as a literal value in all subsequent commands.
 
-**Otherwise**, read from environment (with sanitization):
+**Otherwise**, read from environment (with sanitization). Source shell configs and the local `.env` file first — sandboxed environments don't inherit shell variables:
 
 ```bash
+for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done
+[ -f ".env" ] && export $(grep -v '^#' .env | xargs) 2>/dev/null
 printf '%s' "$OPENPROJECT_URL" | tr -d '\r\n '
 ```
 
-If empty, try sourcing shell configs:
-
-```bash
-for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done && printf '%s' "$OPENPROJECT_URL" | tr -d '\r\n '
-```
-
-If still empty, tell user to set `OPENPROJECT_URL`.
+If still empty, tell user to set `OPENPROJECT_URL` in their shell environment or in a `.env` file in the current directory.
 
 ## Step 2: Get API Key
 
@@ -38,13 +34,15 @@ IMPORTANT: Environment variables in Claude Code may contain invisible characters
 printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n '
 ```
 
-If empty, try sourcing shell configs:
+If empty (and you haven't already sourced shell configs and `.env` in Step 1, do so now):
 
 ```bash
-for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done && printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n '
+for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done
+[ -f ".env" ] && export $(grep -v '^#' .env | xargs) 2>/dev/null
+printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n '
 ```
 
-If still empty, tell user to set `OPENPROJECT_API_KEY` (from My Account → Access tokens).
+If still empty, tell user to set `OPENPROJECT_API_KEY` in their shell environment or in a `.env` file in the current directory (from My Account → Access tokens).
 
 ## Step 3: Make API Calls
 
