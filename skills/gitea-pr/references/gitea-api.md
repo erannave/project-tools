@@ -515,9 +515,12 @@ DELETE /repos/{owner}/{repo}/actions/artifacts/{artifact_id}
 
 Per artifact: `id`, `name`, `size_in_bytes`, `expired`, `created_at`, `expires_at`, `url`.
 
-Download is always **`/actions/artifacts/{artifact_id}/zip`** and always a zip,
-even for a single file. It redirects, so use `curl -sL`. Check `expired` first —
-an expired artifact 404s.
+`/actions/artifacts/{artifact_id}/zip` 302s to a signed `.../zip/raw?sig=...`
+URL that returns the artifact's stored bytes — not necessarily a zip. A
+single-file artifact came back as a gzipped tar with
+`content-disposition: inline; filename=...`. `-L` is required to follow the
+redirect; check `content-disposition` or sniff the content before assuming
+`unzip` applies. Check `expired` first — an expired artifact 404s.
 
 ## Branch Protections
 

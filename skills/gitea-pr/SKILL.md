@@ -114,10 +114,21 @@ Only when `tea` is unavailable.
 
 ```bash
 for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done
-[ -f .env ] && export $(grep -v '^#' .env | xargs) 2>/dev/null
-TOKEN=$(printf '%s' "${GITEA_ACCESS_TOKEN:-${GITEA_TOKEN:-$GITEA_API_TOKEN}}" | tr -d '\r\n ')
+if [ -f .env ]; then
+  for name in GITEA_ACCESS_TOKEN GITEA_TOKEN GITEA_API_TOKEN; do
+    val=$(grep -E "^${name}=" .env | head -1 | cut -d= -f2-)
+    [ -n "$val" ] && export "$name=$val"
+  done
+fi
+TOKEN="${GITEA_ACCESS_TOKEN:-${GITEA_TOKEN:-$GITEA_API_TOKEN}}"
+TOKEN=${TOKEN%\"}; TOKEN=${TOKEN#\"}; TOKEN=${TOKEN%\'}; TOKEN=${TOKEN#\'}
+TOKEN=$(printf '%s' "$TOKEN" | tr -d '\r\n ')
 echo "Token length: ${#TOKEN}"
 ```
+
+Never `export $(grep -v '^#' .env | xargs)` — an inline `#` (a value with a space
+before a trailing comment) aborts zsh mid-parse, so the token is never computed
+and the failure looks like "no token found" instead of "the shell died".
 
 Probe all three names — `GITEA_ACCESS_TOKEN` is the most common, and reading only
 `GITEA_TOKEN` is the single largest source of `401`/`NO_TOKEN` failures. Sandboxes

@@ -130,8 +130,16 @@ for a in d.get('artifacts', d if isinstance(d, list) else []):
 "
 ```
 
-Skip anything marked expired — it 404s. Then download; the endpoint is always
-`/actions/artifacts/{id}/zip` and always yields a zip, even for one file:
+An empty listing (`total_count: 0`) does not prove the run produced no
+artifacts: `actions/upload-artifact@v3` steps report success in the job log
+but never appear in this endpoint, while `v4`-protocol uploads (including
+`docker/setup-buildx-action`'s `.dockerbuild` records) do. Check the job log
+for "successfully uploaded" before concluding a run has nothing to fetch —
+that log is the fallback data source when the listing is empty.
+
+Skip anything marked expired — it 404s. Then download. The endpoint is always
+`/actions/artifacts/{id}/zip`, but the bytes behind it are not necessarily a
+zip — see `gitea-api.md`'s Artifacts section:
 
 ```bash
 NAME=test-results
