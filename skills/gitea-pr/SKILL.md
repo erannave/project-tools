@@ -52,7 +52,8 @@ unquoted parameters, so `R="-l x -r y"; tea $R ...` fails with
 | Changed files | `tea api '/repos/{owner}/{repo}/pulls/<n>/files'` |
 | Create PR | `tea pr create --base main --head <branch> -t "<title>" -d "<body>"` |
 | Create **draft** | `tea pr create --draft --base main --head <branch> -t "<title>"` |
-| Mark ready | `tea pr edit <n> -t "<title without the WIP: prefix>"` |
+| Mark ready | `tea pr edit <n> --ready` |
+| Mark existing PR draft | `tea pr edit <n> --draft` |
 | Edit title/body | `tea pr edit <n> -t "..." -d "..."` |
 | Comment | `tea comment <n> "$(cat body.md)"` |
 | Review comments | `tea pr rc <n> -o tsv` · resolve with `tea pr resolve <comment-id>` |
@@ -79,8 +80,15 @@ exit non-zero. Outside a Gitea checkout, `tea` reports
 `Error: remote repository required: specify id via --repo`; add `-l` and `-r`.
 
 `tea pr <n>` **ignores `--fields`** and renders the full PR body as markdown —
-which is a lot of tokens. Use `-o json` for a single PR and pipe it, or use
-`tea pr ls -f ...` when you want columns.
+which is a lot of tokens. Worse, `-o` only takes effect on the single-PR view when
+the value is `json`; `yaml`/`tsv`/`csv` silently fall back to that same markdown
+render. So use `-o json` and pipe it, or use `tea pr ls -f ...` when you want
+columns. Note the single-PR JSON has **no `ci` key** — CI state comes from
+`tea pr ls -f ci` or, properly, from `scripts/pr_checks.py` below.
+
+**`-r` is ambiguous on `tea pr edit`**, where it is listed as both `--repo` and
+`--add-reviewers`. Spell those out in full on that subcommand; `-r owner/repo`
+there risks requesting a review instead of selecting the repo.
 
 ## Drafts are a title convention, not a flag
 
@@ -93,8 +101,9 @@ A PR is a draft iff its title starts with a configured WIP prefix — `WIP:` or
 
 - **Create a draft:** title it `WIP: <title>`, or let `tea pr create --draft`
   prepend the prefix.
-- **Mark it ready:** PATCH the title with the prefix stripped
-  (`tea pr edit <n> -t "<title>"`). There is no "ready for review" endpoint.
+- **Mark it ready:** `tea pr edit <n> --ready` strips the prefix for you. On the
+  raw API, PATCH `title` with the prefix removed — there is no "ready for review"
+  endpoint. `tea pr edit <n> --draft` goes the other way and is idempotent.
 
 Prefixes are server-configurable and not exposed via the API. If `draft` comes
 back `false` on a PR you titled `WIP:`, that instance uses different prefixes.
