@@ -20,9 +20,20 @@ Parse the base URL directly from it. Use it as a literal value in all subsequent
 
 ```bash
 for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done
-[ -f ".env" ] && export $(grep -v '^#' .env | xargs) 2>/dev/null
+if [ -f .env ]; then
+  for name in OPENPROJECT_URL OPENPROJECT_API_KEY; do
+    val=$(grep -E "^${name}=" .env | head -1 | cut -d= -f2-)
+    val=${val%\"}; val=${val#\"}; val=${val%\'}; val=${val#\'}
+    [ -n "$val" ] && export "$name=$val"
+  done
+fi
 printf '%s' "$OPENPROJECT_URL" | tr -d '\r\n '
 ```
+
+Never `export $(grep -v '^#' .env | xargs)` — `grep -v '^#'` drops only whole-line
+comments, so a value with an inline `#` reaches `export` as a bare word and zsh
+aborts the whole script (`not valid in this context`). Nothing below it runs, so
+the `printf` never fires and an empty result looks like an unset variable.
 
 If still empty, tell user to set `OPENPROJECT_URL` in their shell environment or in a `.env` file in the current directory.
 
@@ -38,7 +49,13 @@ If empty (and you haven't already sourced shell configs and `.env` in Step 1, do
 
 ```bash
 for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do [ -f "$f" ] && source "$f" 2>/dev/null; done
-[ -f ".env" ] && export $(grep -v '^#' .env | xargs) 2>/dev/null
+if [ -f .env ]; then
+  for name in OPENPROJECT_URL OPENPROJECT_API_KEY; do
+    val=$(grep -E "^${name}=" .env | head -1 | cut -d= -f2-)
+    val=${val%\"}; val=${val#\"}; val=${val%\'}; val=${val#\'}
+    [ -n "$val" ] && export "$name=$val"
+  done
+fi
 printf '%s' "$OPENPROJECT_API_KEY" | tr -d '\r\n '
 ```
 
