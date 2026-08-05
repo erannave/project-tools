@@ -70,12 +70,13 @@ class Transport:
                     "no `tea` on PATH and no base URL — pass --base-url, or run "
                     "from a clone whose origin points at the Gitea instance"
                 )
-            self.token = _token_from_env()
+            self.token = find_token()
             if not self.token:
                 raise TransportError(
-                    "no API token found. Export GITEA_ACCESS_TOKEN (or "
-                    "GITEA_TOKEN / GITEA_API_TOKEN), or install and log in "
-                    "with `tea login add`"
+                    "no API token found in the environment, ./.env, or your "
+                    "shell rc files. Export GITEA_ACCESS_TOKEN (or GITEA_TOKEN "
+                    "/ GITEA_API_TOKEN), or install and log in with "
+                    "`tea login add`"
                 )
 
     def get(self, path):
@@ -124,16 +125,76 @@ class Transport:
         return data
 
 
+TOKEN_NAMES = ("GITEA_ACCESS_TOKEN", "GITEA_TOKEN", "GITEA_API_TOKEN")
+
+
+def _clean(raw):
+    # Tokens sourced from shell configs or .env files often carry a trailing \r
+    # or stray whitespace; either one breaks the auth header.
+    return raw.strip().strip("\r\n").strip("'\"") if raw else None
+
+
 def _token_from_env():
-    for name in ("GITEA_ACCESS_TOKEN", "GITEA_TOKEN", "GITEA_API_TOKEN"):
-        raw = os.environ.get(name)
-        if raw:
-            # Env vars picked up from sourced shell configs often carry a
-            # trailing \r or stray whitespace; both break the auth header.
-            cleaned = raw.strip().strip("\r\n")
-            if cleaned:
-                return cleaned
+    for name in TOKEN_NAMES:
+        cleaned = _clean(os.environ.get(name))
+        if cleaned:
+            return cleaned
     return None
+
+
+def _token_from_dotenv():
+    try:
+        with open(".env", encoding="utf-8", errors="replace") as fh:
+            lines = fh.readlines()
+    except OSError:
+        return None
+    found = {}
+    for line in lines:
+        line = line.strip()
+        if line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        if key.startswith("export "):
+            key = key[len("export ") :].strip()
+        if key in TOKEN_NAMES:
+            found[key] = _clean(value)
+    for name in TOKEN_NAMES:
+        if found.get(name):
+            return found[name]
+    return None
+
+
+def _token_from_shell_configs():
+    """Last resort: ask a shell to source the usual rc files and print the token.
+
+    Sandboxes start with a clean environment, so a token that exists only in
+    ~/.zshrc or similar is invisible to os.environ. This mirrors what the curl
+    path in SKILL.md does by hand.
+    """
+    snippet = (
+        "for f in ~/.zshenv ~/.zshrc ~/.bashrc ~/.profile; do "
+        '[ -f "$f" ] && . "$f" >/dev/null 2>&1; done; '
+        'printf %s "${GITEA_ACCESS_TOKEN:-${GITEA_TOKEN:-${GITEA_API_TOKEN:-}}}"'
+    )
+    for shell in ("zsh", "bash", "sh"):
+        exe = shutil.which(shell)
+        if not exe:
+            continue
+        try:
+            proc = subprocess.run(
+                [exe, "-c", snippet], capture_output=True, text=True, timeout=15
+            )
+        except (subprocess.TimeoutExpired, OSError):
+            continue
+        token = _clean(proc.stdout)
+        if token:
+            return token
+    return None
+
+
+def find_token():
+    return _token_from_env() or _token_from_dotenv() or _token_from_shell_configs()
 
 
 def _base_url_from_git_remote():
@@ -198,7 +259,7 @@ def fetch_statuses(api, owner_repo, sha):
 
 def fetch_runs(api, owner_repo, sha):
     """Every Actions run for this exact commit, paged rather than limit-bombed."""
-    runs, page = [], 1
+    runs, page, total = [], 1, None
     while page <= MAX_PAGES:
         data = api.get(
             f"/repos/{owner_repo}/actions/runs"
@@ -212,6 +273,14 @@ def fetch_runs(api, owner_repo, sha):
         if isinstance(total, int) and len(runs) >= total:
             break
         page += 1
+    # Say so rather than quietly understating the check list, the same way
+    # fetch_statuses does.
+    if isinstance(total, int) and len(runs) < total:
+        print(
+            f"note: fetched {len(runs)} of {total} Actions runs "
+            f"(stopped at {MAX_PAGES} pages); the summary below is incomplete",
+            file=sys.stderr,
+        )
     return runs
 
 

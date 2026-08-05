@@ -62,7 +62,10 @@ A PR is a draft iff its title starts with a configured WIP prefix — `WIP:` or
 - **Create a draft:** title it `WIP: <real title>`, or use `tea pr create --draft`,
   which prepends the prefix for you.
 - **Mark it ready:** `PATCH .../pulls/{index}` with `title` set to the title minus
-  the prefix. There is no "ready for review" endpoint.
+  the prefix. There is no "ready for review" endpoint. With the CLI, prefer
+  `tea pr edit <n> --ready`, which strips the prefix without you retyping the
+  title — retyping it by hand silently renames the PR if you get it wrong.
+  `tea pr edit <n> --draft` is the reverse, and is idempotent.
 
 Prefixes are server-configurable (`[repository.pull-request] WORK_IN_PROGRESS_PREFIXES`)
 and are not exposed through the API. If `draft` comes back `false` on a PR you

@@ -15,9 +15,12 @@ the base URL and auth header spelled out:
 curl -s 'BASE_URL/api/v1<path>' -H "Authorization: token $TOKEN"
 ```
 
-Substitute `{owner}`/`{repo}` yourself, since only `tea` fills those in. The one
-command with no curl equivalent is `tea actions runs logs`; step 2 gives the API
-call that replaces it.
+Substitute `{owner}`/`{repo}` yourself, since only `tea` fills those in.
+
+The one command with **no** direct equivalent is `tea actions runs logs <run-id>`.
+Gitea's REST API exposes logs per *job* only — there is no run-scoped endpoint —
+so `tea` is fanning out client-side. Without it, do the same in two steps: list
+the run's jobs, then fetch each job's log. Step 2 spells this out.
 
 ## 1. Get the check list
 
@@ -54,11 +57,31 @@ tea actions runs logs <run-id> --job <job-id>  # one job
 `-f` on this command is `--follow`, **not** `--fields`. `-r owner/repo` and
 `-l login` work as usual.
 
-Or straight from the API, which is what you want when piping:
+Straight from the API — one job at a time, which is what you want when piping:
 
 ```bash
 tea api '/repos/OWNER/REPO/actions/jobs/JOB_ID/logs' > /tmp/job.log
+# or, without tea:
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/actions/jobs/JOB_ID/logs' \
+  -H "Authorization: token $TOKEN" > /tmp/job.log
 ```
+
+There is no run-scoped logs endpoint, so to cover a whole run without `tea`, list
+its jobs first and loop:
+
+```bash
+curl -s "BASE_URL/api/v1/repos/OWNER/REPO/actions/runs/RUN_ID/jobs" \
+  -H "Authorization: token $TOKEN" \
+  | python3 -c "import sys,json; [print(j['id']) for j in json.load(sys.stdin)['jobs']]" \
+  | while read -r jid; do
+      echo "=== job $jid ==="
+      curl -s "BASE_URL/api/v1/repos/OWNER/REPO/actions/jobs/$jid/logs" \
+        -H "Authorization: token $TOKEN" | tail -100
+    done
+```
+
+`pr_checks.py` already prints the failing job ids, so you can usually skip the
+listing step and fetch just the jobs that failed.
 
 Logs are long and the failure is at the **end**. Never `head -c` them:
 
@@ -75,8 +98,15 @@ For a failing *status* rather than a run, the payload is the `description` plus
 Only once you know which checks failed, and only what you need:
 
 ```bash
-tea api '/repos/OWNER/REPO/pulls/PR.diff'        > /tmp/pr.diff &
-tea api '/repos/OWNER/REPO/pulls/PR/files'       > /tmp/pr_files.json &
+tea api '/repos/OWNER/REPO/pulls/PR.diff'  > /tmp/pr.diff &
+tea api '/repos/OWNER/REPO/pulls/PR/files' > /tmp/pr_files.json &
+wait
+
+# without tea:
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR.diff' \
+  -H "Authorization: token $TOKEN" > /tmp/pr.diff &
+curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR/files' \
+  -H "Authorization: token $TOKEN" > /tmp/pr_files.json &
 wait
 ```
 
@@ -90,6 +120,7 @@ Structured reports (JUnit XML, ESLint JSON, coverage) are more actionable than l
 scraping when a suite has many failures.
 
 ```bash
+# tea api '...' — or: curl -s 'BASE_URL/api/v1/...' -H "Authorization: token $TOKEN"
 tea api '/repos/OWNER/REPO/actions/runs/RUN_ID/artifacts' | python3 -c "
 import sys, json
 d = json.load(sys.stdin)
@@ -174,7 +205,12 @@ grep -rn -iE 'error|failed' /tmp/test-results/ --include='*.log' --include='*.tx
 1. Confirm which repo you are in — `git remote get-url origin`. If it already
    points at the PR's repo, just check out the branch; do not clone.
    ```bash
+   # with tea: tea pr checkout PR
    BRANCH=$(tea api '/repos/OWNER/REPO/pulls/PR' \
+     | python3 -c "import sys,json; print(json.load(sys.stdin)['head']['ref'])")
+   # without tea:
+   BRANCH=$(curl -s 'BASE_URL/api/v1/repos/OWNER/REPO/pulls/PR' \
+     -H "Authorization: token $TOKEN" \
      | python3 -c "import sys,json; print(json.load(sys.stdin)['head']['ref'])")
    git fetch origin "$BRANCH" && git checkout "$BRANCH"
    ```
